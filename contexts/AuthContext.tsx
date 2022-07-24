@@ -1,4 +1,4 @@
-import React, { createContext, useEffect, useState } from 'react';
+import React, { createContext, useEffect, useState, useRef } from 'react';
 import Router from 'next/router';
 import { setCookie, parseCookies, destroyCookie } from 'nookies';
 import { api } from '../services/apiClient';
@@ -23,6 +23,7 @@ interface AuthContextData {
   isAuthenticated: boolean;
   user: User;
   signOut(): void;
+  authChannel: BroadcastChannel;
 }
 
 export const AuthContext = createContext({} as AuthContextData);
@@ -30,6 +31,7 @@ export const AuthContext = createContext({} as AuthContextData);
 export function signOut() {
   destroyCookie(undefined, 'auth.token');
   destroyCookie(undefined, 'auth.refreshToken');
+
   Router.push('/');
 }
 
@@ -37,6 +39,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User>({} as User);
 
   const isAuthenticated = !!user?.email;
+
+  const authChannel = useRef<BroadcastChannel>(null);
+
+  useEffect(() => {
+    authChannel.current = new BroadcastChannel('auth');
+
+    authChannel.current.onmessage = (message) => {
+      console.log(message);
+
+      switch (message.data) {
+        case 'signOut':
+          signOut();
+          break;
+        default:
+          break;
+      }
+    };
+  }, [authChannel]);
 
   useEffect(() => {
     const { 'auth.token': token } = parseCookies();
@@ -75,14 +95,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       api.defaults.headers['Authorization'] = `Bearer ${token}`;
 
       Router.push('/dashboard');
-      console.log(response.data);
     } catch (err) {
       console.log(err);
     }
   }
 
   return (
-    <AuthContext.Provider value={{ signIn, isAuthenticated, user, signOut }}>
+    <AuthContext.Provider
+      value={{ signIn, isAuthenticated, user, signOut, authChannel }}
+    >
       {children}
     </AuthContext.Provider>
   );
