@@ -4,11 +4,13 @@ import { setupAPIClient } from '../services/api';
 import { api } from '../services/apiClient';
 import { AuthTokenError } from '../services/errors/AuthTokenError';
 import { withSSRAuth } from '../utils/withSSRAuth';
+import { useCan } from '../hooks/useCan';
 
 import { destroyCookie } from 'nookies';
+import { Can } from '../component/Can';
 
 export default function Dashboard() {
-  const { user } = useContext(AuthContext);
+  const { user, signOut, authChannel } = useContext(AuthContext);
 
   useEffect(() => {
     api
@@ -17,10 +19,20 @@ export default function Dashboard() {
       .catch((err) => console.log(err));
   }, []);
 
+  function handleSignOut() {
+    authChannel.current.postMessage('signOut');
+    signOut();
+  }
+
   return (
     <>
       <h1>Dashboard</h1>
       {user.email}
+
+      <button onClick={handleSignOut}>Sign out</button>
+      <Can permissions={['metrics.list']}>
+        <div>Métricas</div>
+      </Can>
     </>
   );
 }
@@ -28,8 +40,6 @@ export default function Dashboard() {
 export const getServerSideProps = withSSRAuth(async (context) => {
   const apiClient = setupAPIClient(context);
   const response = await apiClient.get('/me');
-
-  console.log(response);
 
   return {
     props: {},
